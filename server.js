@@ -13,6 +13,7 @@ integrity problem for me and him
 const data_services = require("./data-service.js")
 var express = require("express"); 
 var app = express();
+const HTTP_PORT = process.env.PORT || 8080; 
 var path = require("path"); 
 const fs =require('fs');
 var exphbs = require('express-handlebars');
@@ -52,10 +53,9 @@ app.engine('.hbs',exphbs.engine({
 }));
 app.set('view engine','.hbs');
 
-var HTTP_PORT = process.env.PORT || 8080; 
-function onHttpStart(){
-    console.log("Express http server listening on: " + HTTP_PORT);
-}
+
+
+
 
 app.set('view engine','.hbs');
 app.use(function(req,res,next){
@@ -65,110 +65,193 @@ app.use(function(req,res,next){
 });
 
 
-app.get("/", (req, res) => {
-    res.render("home");
+app.get('/', (req, res) => {
+  res.render('home', { layout: 'main' });
 });
 
-app.get("/about", (req, res) => {
-    res.render("about");
+app.get('/about', (req, res) => {
+  res.render('about', { layout: 'main' });
 });
 
-app.get("/employees/add", (req, res) => {
-    
-    res.render("addEmployee");
-});
-
-app.get("/images/add", (req, res) => {
-    res.render("addImage");
-});
-
-app.get('/employee/:employeeNum', (req, res) => {
-    data_services.getEmployeeByNum(req.params.employeeNum)
-    .then((data) => res.render("employee",{employee:data}))
-    .catch(()=>{res.render("employee",{message:"no results"})
-})
-});
-
-//modified routes
-app.get('/employees', (req, res) => {
-    if(req.query.status) {
-        data_services.getEmployeesByStatus(req.query.status)
-            .then((data) => res.render("employees",{employees:data}))
-            .catch(() => res.render("employees",{message: "no results"}))
-    }else if(req.query.manager){
-        data_services.getEmployeesByManager(req.query.manager)
-            .then((data) => res.render("employees",{employees:data}))
-            .catch(() => res.render("employees",{message: "no results"}))
-    }else if(req.query.department){
-        data_services.getEmployeesByDepartment(req.query.department)
-            .then((data) => res.render("employees",{employees:data}))
-            .catch(() => res.render("employees",{message: "no results"}))
-    }else{
-        data_services.getAllEmployees()
-            .then((data) => res.render("employees",{employees:data}))
-            .catch(() => res.render("employees",{message: "no results"}))
-    }
-});
-
-/*app.get("/managers",function(req,res){
-    data_services.getManagers().then(function(data){
-        res.json(data);
+/*Updated  Employees Routes  */
+app.get('/employees/add', (req, res) => {
+  data_services
+    .getDepartments()
+    .then(function (data_services) {
+      res.render('addEmployee', { departments: data_services });
     })
-    .catch(function(err){
-        res.json({"message":err})
-   // })
-})*/
+    .catch(() => res.render('addEmployee', { departments: [] }));
+});
 
+app.get('/employees', (req, res) => {
+  if (req.query.status) {
+    data_services
+      .getEmployeesByStatus(req.query.status)
+      .then((data_services) => {
+        res.render('employees', { employee: data_services });
+      })
+      .catch((err) => {
+        res.render({ message: 'no results' });
+      });
+  }
+
+  if (req.query.department) {
+    data_services
+      .getEmployeesByDepartment(req.query.department)
+      .then((data_services) => {
+        res.render('employees', { employee: data_services });
+      })
+      .catch((err) => {
+        res.render({ message: 'no results' });
+      });
+  }
+
+  if (req.query.manager) {
+    data_services
+      .getEmployeesByManager(req.query.manager)
+      .then((data_services) => {
+        res.render('employees', { employee: data_services });
+      })
+      .catch((err) => {
+        res.render({ message: 'no results' });
+      });
+  } else {
+    data_services
+      .getAllEmployees()
+      .then((data_services) => {
+        res.render('employees', { employee: data_services, layout: 'main' });
+      })
+      .catch((err) => {
+        res.render({ message: 'no results' });
+      });
+  }
+});
+app.get('/employee/:empNum', (req, res) => {
+  let viewData = {};
+  data_services
+    .getEmployeeByNum(req.params.empNum)
+    .then((data_services) => {
+      if (data_services) {
+        viewData.employee = data_services;
+      } else {
+        viewData.employee = null;
+      }
+    })
+    .catch(() => {
+      viewData.employee = null;
+    })
+    .then(data_services.getDepartments)
+    .then((data_services) => {
+      viewData.departments = data_services;
+      for (let i = 0; i < viewData.departments.length; i++) {
+        if (viewData.departments[i].departmentId == viewData.employee.department) {
+          viewData.departments[i].selected = true;
+        }
+      }
+    })
+    .catch(() => {
+      viewData.departments = [];
+    })
+    .then(() => {
+      if (viewData.employee == null) {
+        res.status(404).send('Employee Not Found');
+      } else {
+        res.render('employee', { viewData: viewData });
+      }
+    });
+});
+app.get('/employees/delete/:empNum', (req, res) => {
+  data_services
+    .deleteEmployeeByNum(req.params.empNum)
+    .then(() => res.redirect('/employees'))
+    .catch(() =>
+      res.status(500).send('Unable to Remove Employee / Employee not found')
+    );
+});
+/*Updated  Department Routes*/
 app.get('/departments', (req, res) => {
-    data_services.getDepartments()
-        .then((data) => res.render("departments",{departments:data}))
-        .catch(() => res.render("departments",{"message": "no results"}))
-})
+  data_services
+    .getDepartments()
+    .then((data_services) => {
+      res.render('departments', {
+        departments: data_services,
+      });
+    })
+    .catch((err) => {
+      res.render({ message: 'no results' });
+    });
+});
 
- 
-app.get("/images/add", function(req,res){
-    res.sendFile(path.join(__dirname + views + "addImage.html"));
-  })
+app.get('/departments/add', (req, res) => {
+  res.render('addDepartment');
+});
+
+app.get('/department/:departmentId', (req, res) => {
+  data_services
+    .getDepartmentById(req.params.departmentId)
+    .then((data_services) => {
+      if (data_services.length > 0) res.render('department', { department: data_services });
+      else {
+        res.status(404).send('Department Not Found');
+      }
+    })
+    .catch(() => {
+      res.status(404).send('Department Not Found');
+    });
+});
+/* Updated Image Routes */
+app.get('/images/add', (req, res) => {
+  res.render('addImage');
+});
 
 app.get("/images", (req, res) => {
-    fs.readdir("./public/images/uploaded", function(err, imageFile){
-        res.render("images",  { data: imageFile, title: "Images" });
-    })
+  fs.readdir("./public/images/uploaded", function(err, imageFile){
+      res.render("images",  { data: imageFile, title: "Images" });
+  })
 
 })
 
-app.post("/images/add", upload.single("imageFile"), function(req, res){  
-    res.redirect("/images")
-  });
-
-
-  app.post('/employees/add', function(req, res) {
-    data_services.addEmployee(req.body)
-        .then(res.redirect('/employees'))
-        .catch((err) => res.json({"message": err}))   
-}) 
-
-// A filter in which employye number is taken and detailes are shown
-
-
-app.post("/employee/update", function(req, res){
-    data_services.updateEmployee(req.body)
-    .then(res.redirect('/employees'))
+/* App posting methods  */
+app.post('/images/add', upload.single('imageFile'), (req, res) => {
+  res.render('addImage', { layout: 'main' });
 });
- 
-app.use((req, res) => {
-    res.status(404).send("Sorry Guys This page is not found");
+
+app.post('/employees/add', (req, res) => {
+  data_services
+    .addEmployee(req.body)
+    .then(() => res.redirect('/employees'))
+    .catch((err) => res.json({ message: err }));
+});
+
+app.post('/employee/update', (req, res) => {
+  data_services.updateEmployee(req.body).then((data_services) => {
+    res.redirect('/employees/');
   });
+});
 
+app.post('/departments/add', (req, res) => {
+  data_services
+    .addDepartment(req.body)
+    .then(() => res.redirect('/departments'))
+    .catch((err) => res.json({ message: err }));
+});
 
-data_services.initialize().then(function(data){
-    app.listen(HTTP_PORT, onHttpStart);
-  
-  }).catch(function(err){
-    console.log(err);
+app.post('/departments/update', (req, res) => {
+  data_services
+    .updateDepartment(req.body)
+    .then(res.redirect('/departments'))
+    .catch((err) => res.json({ message: err }));
+});
+
+app.get('*', (req, res) => {
+  res.status(404).send('Page Not Found');
+});
+
+data_services
+  .initialize()
+  .then(() => {
+    app.listen(HTTP_PORT, () =>
+      console.log(`Express http server listening on ${HTTP_PORT}`)
+    );
   })
-
-
-  
-
-  
+  .catch((e) => console.log(e));
